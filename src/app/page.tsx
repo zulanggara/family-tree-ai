@@ -182,10 +182,10 @@ export default function HomePage() {
         )}
 
         {/* Tree container */}
-        <div className="flex-1 relative overflow-hidden">
+        <div className="flex-1 relative">
           <div
-            className="tree-scroll-container absolute inset-0 p-6"
-            style={{ overflowX: 'auto', overflowY: 'auto' }}
+            className="tree-scroll-container w-full h-full p-6"
+            style={{ overflowX: "auto", overflowY: "auto", minHeight: "calc(100vh - 200px)" }}
           >
             <FamilyTree
               roots={roots}

@@ -8,7 +8,6 @@ export function buildMemberMap(data: FamilyData): Map<string, FamilyMember> {
   return map;
 }
 
-// Ambil semua spouseId dari member (support marriages + legacy spouseIds)
 export function getSpouseIds(member: FamilyMember): string[] {
   if (member.marriages && member.marriages.length > 0) {
     return member.marriages.map(m => m.spouseId);
@@ -16,25 +15,21 @@ export function getSpouseIds(member: FamilyMember): string[] {
   return member.spouseIds;
 }
 
-// Ambil info marriage tertentu
 export function getMarriage(member: FamilyMember, spouseId: string): Marriage | null {
   if (member.marriages) {
     return member.marriages.find(m => m.spouseId === spouseId) ?? null;
   }
-  // Legacy fallback: jika tidak ada marriages, anggap aktif
   if (member.spouseIds.includes(spouseId)) {
     return { spouseId, status: 'married' };
   }
   return null;
 }
 
-// Apakah pernikahan ini masih aktif?
 export function isActiveMarriage(marriage: Marriage | null): boolean {
   if (!marriage) return false;
   return marriage.status === 'married' || marriage.status === 'separated';
 }
 
-// Status label untuk UI
 export function getMarriageStatusLabel(status: MarriageStatus): string {
   const labels: Record<MarriageStatus, string> = {
     married: 'Menikah',
@@ -46,7 +41,6 @@ export function getMarriageStatusLabel(status: MarriageStatus): string {
   return labels[status];
 }
 
-// Warna badge per status
 export function getMarriageStatusColor(status: MarriageStatus): string {
   const colors: Record<MarriageStatus, string> = {
     married: 'text-green-400 bg-green-500/10 border-green-500/30',
@@ -58,7 +52,6 @@ export function getMarriageStatusColor(status: MarriageStatus): string {
   return colors[status];
 }
 
-// BFS: semua keturunan
 export function getDescendants(memberId: string, memberMap: Map<string, FamilyMember>): Set<string> {
   const result = new Set<string>();
   const queue: string[] = [memberId];
@@ -72,9 +65,7 @@ export function getDescendants(memberId: string, memberMap: Map<string, FamilyMe
         queue.push(childId);
         const child = memberMap.get(childId);
         if (child) {
-          for (const spouseId of getSpouseIds(child)) {
-            result.add(spouseId);
-          }
+          for (const spouseId of getSpouseIds(child)) result.add(spouseId);
         }
       }
     }
@@ -82,7 +73,6 @@ export function getDescendants(memberId: string, memberMap: Map<string, FamilyMe
   return result;
 }
 
-// Recursive: semua leluhur
 export function getAncestors(memberId: string, memberMap: Map<string, FamilyMember>): Set<string> {
   const result = new Set<string>();
   function traverse(id: string) {
@@ -105,19 +95,35 @@ export function getAncestors(memberId: string, memberMap: Map<string, FamilyMemb
   return result;
 }
 
-export function findRoots(members: FamilyMember[]): FamilyMember[] {
-  return members.filter(m => !m.fatherId && !m.motherId);
-}
-
 export function buildTree(members: FamilyMember[], memberMap: Map<string, FamilyMember>): TreeNode[] {
   const visited = new Set<string>();
 
-  const roots = findRoots(members).filter(m => m.childrenIds.length > 0 || getSpouseIds(m).length > 0);
+  // Kumpulkan semua ID yang muncul sebagai spouse dari member lain
+  // → mereka tidak boleh jadi root node tersendiri
+  const appearsAsSpouseOf = new Set<string>();
+  for (const m of members) {
+    for (const sid of getSpouseIds(m)) {
+      appearsAsSpouseOf.add(sid);
+    }
+  }
+
+  // Root = tidak punya parent DAN tidak muncul hanya sebagai spouse orang lain
+  // Tapi jika seseorang adalah spouse sekaligus punya anak sendiri (dari pernikahan berbeda),
+  // dia tetap perlu muncul → kita handle dengan visited check di buildNode
+  const potentialRoots = members.filter(m => !m.fatherId && !m.motherId);
+
+  // Deduplicate: jika A dan B saling spouse, hanya salah satu jadi root
+  // Prioritas: yang punya childrenIds lebih banyak, atau yang datang lebih dulu di array
   const rootSet = new Set<string>();
-  for (const root of roots) {
+  for (const root of potentialRoots) {
     if (rootSet.has(root.id)) continue;
-    const isSpouseOfExisting = getSpouseIds(root).some(sid => rootSet.has(sid));
-    if (!isSpouseOfExisting) rootSet.add(root.id);
+    // Jika sudah ada spouse-nya di rootSet, skip
+    const spouseAlreadyRoot = getSpouseIds(root).some(sid => rootSet.has(sid));
+    if (spouseAlreadyRoot) continue;
+    // Jika dia HANYA muncul sebagai spouse dan tidak punya children → skip, akan digambar inline
+    const isOnlySpouse = appearsAsSpouseOf.has(root.id) && root.childrenIds.length === 0;
+    if (isOnlySpouse) continue;
+    rootSet.add(root.id);
   }
 
   const rootMembers = members.filter(m => rootSet.has(m.id));
@@ -125,9 +131,14 @@ export function buildTree(members: FamilyMember[], memberMap: Map<string, Family
   function buildNode(member: FamilyMember, level: number): TreeNode {
     visited.add(member.id);
     const spouseIds = getSpouseIds(member);
+
+    // Mark all spouses as visited so they don't become separate roots
+    for (const sid of spouseIds) visited.add(sid);
+
     const spouses = spouseIds.map(sid => memberMap.get(sid)).filter(Boolean) as FamilyMember[];
     const spouseMarriages = spouseIds.map(sid => getMarriage(member, sid) ?? { spouseId: sid, status: 'married' as MarriageStatus });
 
+    // Gabungkan childrenIds dari semua pasangan
     const childIds = new Set<string>([...member.childrenIds]);
     for (const spouse of spouses) {
       for (const cid of spouse.childrenIds) childIds.add(cid);
