@@ -55,14 +55,7 @@ function buildLayout(roots: TreeNode[]): {
 
   function place(node: TreeNode, x: number, y: number) {
     const avatarCX = x + AVATAR / 2;
-
-    layouts.set(node.member.id, {
-      treeNode: node,
-      x,
-      y,
-      avatarCX,
-      branchY: y + AVATAR + 20,
-    });
+    layouts.set(node.member.id, { treeNode: node, x, y, avatarCX, branchY: y + AVATAR + 20 });
 
     if (node.children.length > 0) {
       const childrenTotalW = node.children.reduce(
@@ -79,20 +72,15 @@ function buildLayout(roots: TreeNode[]): {
 
   let cursorX = PADDING;
   for (const root of roots) {
-    const w = subtreeWidth(root);
     place(root, cursorX, PADDING);
-    cursorX += w + SIBLING_GAP * 2;
+    cursorX += subtreeWidth(root) + SIBLING_GAP * 2;
   }
 
-  // Shift right if any node underflowed left edge
   let minX = Infinity;
   for (const l of layouts.values()) minX = Math.min(minX, l.x);
   const shift = minX < PADDING ? PADDING - minX : 0;
   if (shift > 0) {
-    for (const l of layouts.values()) {
-      l.x += shift;
-      l.avatarCX += shift;
-    }
+    for (const l of layouts.values()) { l.x += shift; l.avatarCX += shift; }
   }
 
   let maxX = 0, maxY = 0;
@@ -110,7 +98,6 @@ function buildConnections(
   highlight: HighlightState | null
 ): Connection[] {
   const conns: Connection[] = [];
-
   for (const [parentId, layout] of layouts) {
     const { treeNode, avatarCX, y } = layout;
     const fromX = avatarCX;
@@ -123,35 +110,27 @@ function buildConnections(
       const toX = childLayout.avatarCX;
       const toY = childLayout.y;
 
-      const parentHL =
-        highlight?.highlightedIds.has(parentId) || parentId === highlight?.foundId;
-      const childHL =
-        highlight?.highlightedIds.has(child.member.id) ||
-        child.member.id === highlight?.foundId;
+      const parentHL = highlight?.highlightedIds.has(parentId) || parentId === highlight?.foundId;
+      const childHL = highlight?.highlightedIds.has(child.member.id) || child.member.id === highlight?.foundId;
       const isHighlighted = !!(highlight?.highlightedIds.size && parentHL && childHL);
 
       conns.push({
-        fromX, fromY,
-        toX, toY,
+        fromX, fromY, toX, toY,
         isDirect: true,
         isHighlighted,
-        highlightColor:
-          highlight?.mode === 'descendants' ? 'var(--green)' : 'var(--blue)',
+        highlightColor: highlight?.mode === 'descendants' ? 'var(--green)' : 'var(--blue)',
       });
     }
   }
-
   return conns;
 }
 
-// ─── SVG path ─────────────────────────────────────────────────────────────────
 function connPath(conn: Connection): string {
   const { fromX, fromY, toX, toY } = conn;
   const mid = fromY + (toY - fromY) * 0.45;
   return `M ${fromX} ${fromY} C ${fromX} ${mid}, ${toX} ${mid}, ${toX} ${toY}`;
 }
 
-// ─── Highlight helper ─────────────────────────────────────────────────────────
 function getHL(memberId: string, highlight: HighlightState | null): HighlightType {
   if (!highlight || !highlight.highlightedIds.size) return 'none';
   if (memberId === highlight.foundId) return 'self';
@@ -169,32 +148,40 @@ const STATUS_COLOR: Record<MarriageStatus, string> = {
   separated: '#f97316', annulled: '#ef4444',
 };
 
-// ─── NodeAvatar ───────────────────────────────────────────────────────────────
+// ─── NodeAvatar — single/double click ────────────────────────────────────────
 function NodeAvatar({
-  member, highlight, onClick, nodeRef, faded,
+  member, highlight, onClick, onDoubleClick, nodeRef, faded,
 }: {
   member: FamilyMember;
   highlight: HighlightType;
   onClick: () => void;
+  onDoubleClick: () => void;
   nodeRef?: (el: HTMLDivElement | null) => void;
   faded?: boolean;
 }) {
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleClick = () => {
+    if (clickTimer.current) {
+      clearTimeout(clickTimer.current);
+      clickTimer.current = null;
+      onDoubleClick();
+    } else {
+      clickTimer.current = setTimeout(() => {
+        clickTimer.current = null;
+        onClick();
+      }, 250);
+    }
+  };
+
   const isAlive = !member.deathDate;
-
   const ringColor = {
-    self: 'var(--accent)',
-    green: 'var(--green)',
-    blue: 'var(--blue)',
-    dimmed: 'var(--border)',
-    none: 'var(--border-light)',
+    self: 'var(--accent)', green: 'var(--green)',
+    blue: 'var(--blue)', dimmed: 'var(--border)', none: 'var(--border-light)',
   }[highlight];
-
   const hlClass = {
-    self: 'highlighted-self',
-    green: 'highlighted-green',
-    blue: 'highlighted-blue',
-    dimmed: 'dimmed',
-    none: '',
+    self: 'highlighted-self', green: 'highlighted-green',
+    blue: 'highlighted-blue', dimmed: 'dimmed', none: '',
   }[highlight];
 
   return (
@@ -203,7 +190,7 @@ function NodeAvatar({
       data-member-id={member.id}
       className={`tree-node ${hlClass} flex flex-col items-center cursor-pointer group`}
       style={{ width: NODE_W, opacity: faded ? 0.65 : 1 }}
-      onClick={onClick}
+      onClick={handleClick}
     >
       <div className="relative">
         <div
@@ -219,35 +206,26 @@ function NodeAvatar({
                 `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(member.name)}&backgroundColor=1a1828`;
             }}
           />
-          <div
-            className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity"
-            style={{ background: member.gender === 'male' ? 'var(--blue)' : '#ec4899' }}
-          />
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity"
+            style={{ background: member.gender === 'male' ? 'var(--blue)' : '#ec4899' }} />
         </div>
         {isAlive && (
-          <div
-            className="absolute"
-            style={{
-              width: 10, height: 10, borderRadius: '50%',
-              background: 'var(--green)', border: '2px solid var(--bg)',
-              top: 56, left: 54,
-            }}
-          />
+          <div className="absolute" style={{
+            width: 10, height: 10, borderRadius: '50%',
+            background: 'var(--green)', border: '2px solid var(--bg)',
+            top: 56, left: 54,
+          }} />
         )}
         {!isAlive && (
-          <div
-            className="absolute inset-0 rounded-full flex items-end justify-center pb-0.5"
-            style={{ pointerEvents: 'none' }}
-          >
+          <div className="absolute inset-0 rounded-full flex items-end justify-center pb-0.5"
+            style={{ pointerEvents: 'none' }}>
             <span style={{ fontSize: 9, color: '#9ca3af' }}>✝</span>
           </div>
         )}
       </div>
       <div className="mt-2 text-center px-1">
-        <p
-          className="text-xs font-medium text-[var(--text)] leading-tight line-clamp-2"
-          style={{ maxWidth: 82, wordBreak: 'break-word' }}
-        >
+        <p className="text-xs font-medium text-[var(--text)] leading-tight line-clamp-2"
+          style={{ maxWidth: 82, wordBreak: 'break-word' }}>
           {member.name}
         </p>
         <p className="text-[10px] text-[var(--text-subtle)] mt-0.5 leading-tight">
@@ -260,33 +238,31 @@ function NodeAvatar({
 
 // ─── TreeNodeRow ──────────────────────────────────────────────────────────────
 function TreeNodeRow({
-  treeNode, highlight, onClick, nodeRef, memberMap, onShowSpouses,
+  treeNode, highlight, onClick, onDoubleClick, nodeRef, memberMap, onShowSpouses,
 }: {
   treeNode: TreeNode;
   highlight: HighlightState | null;
   onClick: (m: FamilyMember) => void;
+  onDoubleClick: (m: FamilyMember) => void;
   nodeRef: (el: HTMLDivElement | null) => void;
   memberMap: Map<string, FamilyMember>;
   onShowSpouses: (m: FamilyMember) => void;
 }) {
   const { member, spouses, spouseMarriages } = treeNode;
   const memberHL = getHL(member.id, highlight);
-
-  // Only active spouse shown inline; past spouses go to side panel
   const activeSpouseIdx = spouseMarriages.findIndex(m => isActiveMarriage(m));
   const hasMultipleMarriages = spouseMarriages.length > 1;
 
   return (
     <div className="flex items-start">
-      {/* Primary member */}
       <NodeAvatar
         member={member}
         highlight={memberHL}
         onClick={() => onClick(member)}
+        onDoubleClick={() => onDoubleClick(member)}
         nodeRef={nodeRef}
       />
 
-      {/* Active spouse inline */}
       {activeSpouseIdx >= 0 && spouses[activeSpouseIdx] && (() => {
         const spouse = spouses[activeSpouseIdx];
         const marriage = spouseMarriages[activeSpouseIdx];
@@ -297,8 +273,7 @@ function TreeNodeRow({
           <div className="flex items-start">
             <div style={{ width: COUPLE_CONNECTOR, paddingTop: AVATAR / 2 - 8 }}>
               <svg width={COUPLE_CONNECTOR} height="16" viewBox={`0 0 ${COUPLE_CONNECTOR} 16`}>
-                <line x1="0" y1="8" x2={COUPLE_CONNECTOR} y2="8"
-                  stroke={color} strokeWidth="1.5" />
+                <line x1="0" y1="8" x2={COUPLE_CONNECTOR} y2="8" stroke={color} strokeWidth="1.5" />
                 <text x={COUPLE_CONNECTOR / 2} y="14" textAnchor="middle"
                   fontSize="8" fill={color} fontFamily="system-ui">{icon}</text>
               </svg>
@@ -307,22 +282,19 @@ function TreeNodeRow({
               member={spouse}
               highlight={getHL(spouse.id, highlight)}
               onClick={() => onClick(spouse)}
+              onDoubleClick={() => onDoubleClick(spouse)}
             />
           </div>
         );
       })()}
 
-      {/* Badge for multiple marriages */}
       {hasMultipleMarriages && (
         <button
           onClick={() => onShowSpouses(member)}
           className="self-start flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium transition-all hover:opacity-80"
           style={{
-            background: 'var(--accent-dim)',
-            border: '1px solid var(--accent)',
-            color: 'var(--accent)',
-            marginTop: AVATAR / 2 - 8,
-            marginLeft: 4,
+            background: 'var(--accent-dim)', border: '1px solid var(--accent)',
+            color: 'var(--accent)', marginTop: AVATAR / 2 - 8, marginLeft: 4,
           }}
           title="Lihat semua riwayat pernikahan"
         >
@@ -356,34 +328,25 @@ function SpousesPanel({
       <div
         className="relative h-full w-full max-w-xs overflow-y-auto"
         style={{
-          background: 'var(--card)',
-          borderLeft: '1px solid var(--border)',
+          background: 'var(--card)', borderLeft: '1px solid var(--border)',
           animation: 'slideInRight 0.25s ease-out',
         }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
-        <div
-          className="sticky top-0 z-10 flex items-center justify-between px-4 py-4 border-b"
-          style={{ background: 'var(--card)', borderColor: 'var(--border)' }}
-        >
+        <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-4 border-b"
+          style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
           <div>
             <p className="text-xs text-[var(--text-subtle)] mb-0.5">Riwayat Pernikahan</p>
-            <h3 className="font-display text-base font-semibold text-[var(--text)]">
-              {member.name}
-            </h3>
+            <h3 className="font-display text-base font-semibold text-[var(--text)]">{member.name}</h3>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--border)] transition-all"
-          >
+          <button onClick={onClose}
+            className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--border)] transition-all">
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* Marriage cards */}
         <div className="p-4 space-y-3">
           {marriages.map((m, idx) => {
             const spouse = memberMap.get(m.spouseId);
@@ -394,16 +357,13 @@ function SpousesPanel({
             const color = STATUS_COLOR[m.status];
 
             return (
-              <div
-                key={m.spouseId}
+              <div key={m.spouseId}
                 className="rounded-xl p-3 transition-all"
                 style={{
                   background: 'var(--bg)',
                   border: `1px solid ${active ? 'rgba(108,99,255,0.3)' : 'var(--border)'}`,
                   opacity: active ? 1 : 0.8,
-                }}
-              >
-                {/* Status badge */}
+                }}>
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-[10px] text-[var(--text-subtle)] uppercase tracking-wider">
                     Pernikahan ke-{idx + 1}
@@ -413,25 +373,19 @@ function SpousesPanel({
                   </span>
                 </div>
 
-                {/* Spouse info */}
                 {spouse ? (
                   <button
                     onClick={() => { onNavigate(spouse.id); onClose(); }}
                     className="flex items-center gap-3 w-full text-left hover:opacity-80 transition-opacity mb-3"
                   >
-                    <div
-                      className="w-11 h-11 rounded-full overflow-hidden flex-shrink-0"
-                      style={{ border: `2px solid ${color}` }}
-                    >
-                      <img
-                        src={getAvatarUrl(spouse)}
-                        alt={spouse.name}
+                    <div className="w-11 h-11 rounded-full overflow-hidden flex-shrink-0"
+                      style={{ border: `2px solid ${color}` }}>
+                      <img src={getAvatarUrl(spouse)} alt={spouse.name}
                         className="w-full h-full object-cover"
                         onError={e => {
                           (e.target as HTMLImageElement).src =
                             `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(spouse.name)}`;
-                        }}
-                      />
+                        }} />
                     </div>
                     <div>
                       <p className="text-sm font-medium text-[var(--text)]">{spouse.name}</p>
@@ -444,24 +398,17 @@ function SpousesPanel({
                   <p className="text-sm text-[var(--text-subtle)] mb-3 italic">Data tidak tersedia</p>
                 )}
 
-                {/* Dates */}
                 <div className="flex flex-wrap gap-2 text-[10px] text-[var(--text-subtle)]">
                   {m.marriedDate && (
                     <span className="flex items-center gap-1">
                       <span style={{ color }}>●</span>
-                      Menikah:{' '}
-                      {new Date(m.marriedDate).toLocaleDateString('id-ID', {
-                        day: 'numeric', month: 'short', year: 'numeric',
-                      })}
+                      Menikah: {new Date(m.marriedDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </span>
                   )}
                   {m.endDate && (
                     <span className="flex items-center gap-1">
                       <span>○</span>
-                      Berakhir:{' '}
-                      {new Date(m.endDate).toLocaleDateString('id-ID', {
-                        day: 'numeric', month: 'short', year: 'numeric',
-                      })}
+                      Berakhir: {new Date(m.endDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </span>
                   )}
                 </div>
@@ -470,9 +417,7 @@ function SpousesPanel({
           })}
 
           {marriages.length === 0 && (
-            <p className="text-sm text-[var(--text-subtle)] text-center py-8">
-              Tidak ada data pernikahan
-            </p>
+            <p className="text-sm text-[var(--text-subtle)] text-center py-8">Tidak ada data pernikahan</p>
           )}
         </div>
       </div>
@@ -480,16 +425,19 @@ function SpousesPanel({
   );
 }
 
-// ─── Main FamilyTree component ────────────────────────────────────────────────
+// ─── Main FamilyTree ──────────────────────────────────────────────────────────
 interface FamilyTreeProps {
   roots: TreeNode[];
   memberMap: Map<string, FamilyMember>;
   highlight: HighlightState | null;
   onNodeClick: (member: FamilyMember) => void;
+  onNodeDoubleClick: (member: FamilyMember) => void;
   focusId: string | null;
 }
 
-export function FamilyTree({ roots, memberMap, highlight, onNodeClick, focusId }: FamilyTreeProps) {
+export function FamilyTree({
+  roots, memberMap, highlight, onNodeClick, onNodeDoubleClick, focusId,
+}: FamilyTreeProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [zoom, setZoom] = useState(1);
@@ -500,17 +448,14 @@ export function FamilyTree({ roots, memberMap, highlight, onNodeClick, focusId }
     setLayout(buildLayout(roots));
   }, [roots]);
 
-  // Scroll to focused node inside the container (accounts for zoom)
   useEffect(() => {
     if (!focusId || !scrollRef.current || !layout) return;
     const l = layout.layouts.get(focusId);
     if (!l) return;
-    const nodeX = l.avatarCX * zoom;
-    const nodeY = l.y * zoom;
     const c = scrollRef.current;
     c.scrollTo({
-      left: nodeX - c.clientWidth / 2,
-      top: nodeY - c.clientHeight / 2 + (AVATAR * zoom) / 2,
+      left: l.avatarCX * zoom - c.clientWidth / 2,
+      top: l.y * zoom - c.clientHeight / 2 + (AVATAR * zoom) / 2,
       behavior: 'smooth',
     });
   }, [focusId, layout, zoom]);
@@ -526,38 +471,21 @@ export function FamilyTree({ roots, memberMap, highlight, onNodeClick, focusId }
   return (
     <div className="relative w-full h-full flex flex-col">
 
-      {/* ── Zoom controls ── */}
-      <div
-        className="absolute top-3 right-3 z-10 flex items-center gap-1"
-        style={{
-          background: 'var(--card)',
-          border: '1px solid var(--border)',
-          borderRadius: 10,
-          padding: '4px 6px',
-        }}
-      >
-        <button
-          onClick={() => setZoom(z => Math.max(0.3, parseFloat((z - 0.1).toFixed(1))))}
+      {/* Zoom controls */}
+      <div className="absolute top-3 right-3 z-10 flex items-center gap-1"
+        style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '4px 6px' }}>
+        <button onClick={() => setZoom(z => Math.max(0.3, parseFloat((z - 0.1).toFixed(1))))}
           className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--border)] transition-all"
-          style={{ fontSize: 18, fontWeight: 300 }}
-        >−</button>
-        <span
-          className="text-xs text-[var(--text-subtle)] select-none"
-          style={{ minWidth: 36, textAlign: 'center' }}
-        >
+          style={{ fontSize: 18, fontWeight: 300 }}>−</button>
+        <span className="text-xs text-[var(--text-subtle)] select-none" style={{ minWidth: 36, textAlign: 'center' }}>
           {Math.round(zoom * 100)}%
         </span>
-        <button
-          onClick={() => setZoom(z => Math.min(2, parseFloat((z + 0.1).toFixed(1))))}
+        <button onClick={() => setZoom(z => Math.min(2, parseFloat((z + 0.1).toFixed(1))))}
           className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--border)] transition-all"
-          style={{ fontSize: 18, fontWeight: 300 }}
-        >+</button>
+          style={{ fontSize: 18, fontWeight: 300 }}>+</button>
         <div style={{ width: 1, background: 'var(--border)', height: 16, margin: '0 2px' }} />
-        <button
-          onClick={() => setZoom(1)}
-          title="Reset zoom"
-          className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--border)] transition-all"
-        >
+        <button onClick={() => setZoom(1)} title="Reset zoom"
+          className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--border)] transition-all">
           <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round"
               d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
@@ -565,12 +493,9 @@ export function FamilyTree({ roots, memberMap, highlight, onNodeClick, focusId }
         </button>
       </div>
 
-      {/* ── Scrollable canvas ── */}
-      <div
-        ref={scrollRef}
-        className="tree-scroll-container flex-1"
-        style={{ overflow: 'auto', position: 'relative' }}
-      >
+      {/* Scrollable canvas */}
+      <div ref={scrollRef} className="tree-scroll-container flex-1"
+        style={{ overflow: 'auto', position: 'relative' }}>
         <div
           className="tree-zoom-canvas"
           style={{
@@ -584,21 +509,16 @@ export function FamilyTree({ roots, memberMap, highlight, onNodeClick, focusId }
           }}
         >
           {/* SVG connections */}
-          <svg
-            className="absolute inset-0 pointer-events-none"
-            width={layout.totalW}
-            height={layout.totalH}
-          >
+          <svg className="absolute inset-0 pointer-events-none" width={layout.totalW} height={layout.totalH}>
             {connections.map((conn, i) => {
               const dimmed = !!(highlight?.highlightedIds.size && !conn.isHighlighted);
-              const sw = conn.isHighlighted ? 3 : 1.5;
               return (
                 <path
                   key={i}
                   d={connPath(conn)}
                   fill="none"
                   stroke={conn.isHighlighted ? conn.highlightColor : 'var(--connector)'}
-                  strokeWidth={sw}
+                  strokeWidth={conn.isHighlighted ? 3 : 1.5}
                   strokeLinecap="round"
                   opacity={dimmed ? 0.1 : 1}
                   style={{ transition: 'stroke 0.3s, stroke-width 0.3s, opacity 0.3s' }}
@@ -607,7 +527,7 @@ export function FamilyTree({ roots, memberMap, highlight, onNodeClick, focusId }
             })}
           </svg>
 
-          {/* Tree nodes */}
+          {/* Nodes */}
           <div style={{ width: layout.totalW, height: layout.totalH, position: 'relative' }}>
             {[...layout.layouts.values()].map(({ treeNode, x, y }) => (
               <div key={treeNode.member.id} className="absolute" style={{ left: x, top: y }}>
@@ -615,6 +535,7 @@ export function FamilyTree({ roots, memberMap, highlight, onNodeClick, focusId }
                   treeNode={treeNode}
                   highlight={highlight}
                   onClick={onNodeClick}
+                  onDoubleClick={onNodeDoubleClick}
                   nodeRef={(el) => { if (el) nodeRefs.current.set(treeNode.member.id, el); }}
                   memberMap={memberMap}
                   onShowSpouses={setSpousePanelMember}
@@ -625,7 +546,7 @@ export function FamilyTree({ roots, memberMap, highlight, onNodeClick, focusId }
         </div>
       </div>
 
-      {/* Spouses side panel */}
+      {/* Spouses panel */}
       {spousePanelMember && (
         <SpousesPanel
           member={spousePanelMember}
@@ -633,7 +554,7 @@ export function FamilyTree({ roots, memberMap, highlight, onNodeClick, focusId }
           onClose={() => setSpousePanelMember(null)}
           onNavigate={(id) => {
             const m = memberMap.get(id);
-            if (m) onNodeClick(m);
+            if (m) onNodeDoubleClick(m);
           }}
         />
       )}

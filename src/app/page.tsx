@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { FamilyMember, HighlightState, SearchMode, TreeNode } from '@/types';
-import { buildMemberMap, buildTree, getDescendants, getAncestors } from '@/lib/family';
+import { buildMemberMap, buildTree, getDescendants, getAncestors, getSpouseIds } from '@/lib/family';
 import { SearchBar } from '@/components/SearchBar';
 import { FamilyTree } from '@/components/FamilyTree';
 import { DetailModal } from '@/components/DetailModal';
@@ -23,32 +23,15 @@ export default function HomePage() {
     const found = members.find(m =>
       m.name.toLowerCase().includes(query.toLowerCase())
     );
-
     if (!found) {
-      setHighlight({
-        mode,
-        highlightedIds: new Set(),
-        searchQuery: query,
-        foundId: null,
-      });
+      setHighlight({ mode, highlightedIds: new Set(), searchQuery: query, foundId: null });
       return;
     }
-
     const relatedIds = mode === 'descendants'
       ? getDescendants(found.id, memberMap)
       : getAncestors(found.id, memberMap);
-
-    // Also include spouses of found person
-    for (const spouseId of found.spouseIds) {
-      relatedIds.add(spouseId);
-    }
-
-    setHighlight({
-      mode,
-      highlightedIds: relatedIds,
-      searchQuery: query,
-      foundId: found.id,
-    });
+    for (const sid of getSpouseIds(found)) relatedIds.add(sid);
+    setHighlight({ mode, highlightedIds: relatedIds, searchQuery: query, foundId: found.id });
     setFocusId(found.id);
   }, [members, memberMap]);
 
@@ -57,7 +40,21 @@ export default function HomePage() {
     setFocusId(null);
   }, []);
 
+  // Single click → highlight keturunan node tersebut
   const handleNodeClick = useCallback((member: FamilyMember) => {
+    const relatedIds = getDescendants(member.id, memberMap);
+    for (const sid of getSpouseIds(member)) relatedIds.add(sid);
+    setHighlight({
+      mode: 'descendants',
+      highlightedIds: relatedIds,
+      searchQuery: member.name,
+      foundId: member.id,
+    });
+    setFocusId(member.id);
+  }, [memberMap]);
+
+  // Double click → buka modal detail
+  const handleNodeDoubleClick = useCallback((member: FamilyMember) => {
     setSelectedMember(member);
   }, []);
 
@@ -108,14 +105,14 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Nav - desktop */}
+          {/* Nav */}
           <nav className="hidden sm:flex items-center gap-1">
             {['Tree', 'Pencarian', 'Riwayat'].map((item, i) => (
               <button key={item}
                 className={`px-3 py-1.5 rounded-lg text-sm transition-all ${i === 0
                   ? 'text-[var(--accent)] bg-[var(--accent-dim)]'
                   : 'text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--card)]'
-                  }`}>
+                }`}>
                 {item}
               </button>
             ))}
@@ -145,18 +142,21 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Search bar row */}
+        {/* Search bar */}
         <div className="px-4 sm:px-6 pb-3">
           <SearchBar onSearch={handleSearch} onClear={handleClear} />
         </div>
       </header>
 
-      {/* Main content */}
+      {/* Main */}
       <main className="flex-1 flex flex-col">
-        {/* Search result banner */}
+        {/* Highlight banner */}
         {highlight && (
           <div className="px-4 sm:px-6 py-2 border-b flex items-center gap-3"
-            style={{ background: highlight.mode === 'descendants' ? 'var(--green-dim)' : 'var(--blue-dim)', borderColor: 'var(--border)' }}>
+            style={{
+              background: highlight.mode === 'descendants' ? 'var(--green-dim)' : 'var(--blue-dim)',
+              borderColor: 'var(--border)',
+            }}>
             <div className="w-2 h-2 rounded-full flex-shrink-0"
               style={{ background: highlight.mode === 'descendants' ? 'var(--green)' : 'var(--blue)' }} />
             <p className="text-sm text-[var(--text-muted)]">
@@ -168,10 +168,10 @@ export default function HomePage() {
                   <strong className="text-[var(--text)]">
                     {members.find(m => m.id === highlight.foundId)?.name}
                   </strong>
-                  {' '}— {highlight.highlightedIds.size} anggota ditemukan
+                  {' '}— {highlight.highlightedIds.size} anggota
                 </>
               ) : (
-                <span className="text-red-400">Anggota "{highlight.searchQuery}" tidak ditemukan</span>
+                <span className="text-red-400">"{highlight.searchQuery}" tidak ditemukan</span>
               )}
             </p>
             <button onClick={handleClear}
@@ -181,23 +181,24 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Tree container */}
+        {/* Tree */}
         <div className="flex-1 relative">
           <div
-            className="w-full"
-style={{ height: "calc(100vh - 200px)" }}
+            className="w-full h-full"
+            style={{ minHeight: 'calc(100vh - 200px)' }}
           >
             <FamilyTree
               roots={roots}
               memberMap={memberMap}
               highlight={highlight}
               onNodeClick={handleNodeClick}
+              onNodeDoubleClick={handleNodeDoubleClick}
               focusId={focusId}
             />
           </div>
         </div>
 
-        {/* Legend footer */}
+        {/* Legend */}
         <div className="px-4 sm:px-6 py-3 border-t"
           style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
           <Legend />
