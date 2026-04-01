@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { FamilyMember, TreeNode, HighlightState, MarriageStatus } from '@/types';
 import { getAge, getAvatarUrl, isActiveMarriage, getMarriageStatusLabel, getMarriageStatusColor } from '@/lib/family';
+import { usePhoto } from '@/contexts/PhotoContext';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const NODE_W = 90;
@@ -175,6 +176,7 @@ function NodeAvatar({
   faded?: boolean;
 }) {
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { getPhoto } = usePhoto();
 
   const handleClick = () => {
     if (clickTimer.current) {
@@ -213,7 +215,7 @@ function NodeAvatar({
           style={{ width: AVATAR, height: AVATAR, border: `2.5px solid ${ringColor}` }}
         >
           <img
-            src={getAvatarUrl(member)}
+            src={getPhoto(member.id, getAvatarUrl(member))}
             alt={member.name}
             className="w-full h-full object-cover"
             onError={e => {
@@ -461,6 +463,9 @@ interface FamilyTreeProps {
   focusId: string | null;
 }
 
+const MINIMAP_W = 180;
+const MINIMAP_H = 100;
+
 export function FamilyTree({
   roots, memberMap, highlight, onNodeClick, onNodeDoubleClick, onClearHighlight, focusId,
 }: FamilyTreeProps) {
@@ -469,6 +474,12 @@ export function FamilyTree({
   const [zoom, setZoom] = useState(1);
   const [layout, setLayout] = useState<ReturnType<typeof buildLayout> | null>(null);
   const [spousePanelMember, setSpousePanelMember] = useState<FamilyMember | null>(null);
+  const [viewport, setViewport] = useState({ scrollLeft: 0, scrollTop: 0, w: 0, h: 0 });
+
+  // Drag-to-pan state
+  const dragRef = useRef<{ startX: number; startY: number; sl: number; st: number } | null>(null);
+  // Mini-map drag state
+  const mmDragRef = useRef<{ startX: number; startY: number; initSL: number; initST: number } | null>(null);
 
   useEffect(() => {
     setLayout(buildLayout(roots));
@@ -486,6 +497,38 @@ export function FamilyTree({
     });
   }, [focusId, layout, zoom]);
 
+  // Track viewport for mini-map
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const update = () => setViewport({ scrollLeft: el.scrollLeft, scrollTop: el.scrollTop, w: el.clientWidth, h: el.clientHeight });
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => { el.removeEventListener('scroll', update); window.removeEventListener('resize', update); };
+  }, [layout]);
+
+  // Drag-to-pan handlers
+  const onMouseDown = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('.tree-node, button, input')) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    dragRef.current = { startX: e.clientX, startY: e.clientY, sl: el.scrollLeft, st: el.scrollTop };
+    el.style.cursor = 'grabbing';
+    e.preventDefault();
+  };
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!dragRef.current) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollLeft = dragRef.current.sl - (e.clientX - dragRef.current.startX);
+    el.scrollTop = dragRef.current.st - (e.clientY - dragRef.current.startY);
+  };
+  const onMouseUp = () => {
+    dragRef.current = null;
+    if (scrollRef.current) scrollRef.current.style.cursor = '';
+  };
+
   const connections = layout ? buildConnections(layout.layouts, highlight) : [];
 
   if (!layout) return (
@@ -494,8 +537,16 @@ export function FamilyTree({
     </div>
   );
 
+  // Mini-map calculations
+  const mmScaleX = MINIMAP_W / (layout.totalW || 1);
+  const mmScaleY = MINIMAP_H / (layout.totalH || 1);
+  const mmVpW = Math.min(MINIMAP_W, (viewport.w / zoom) * mmScaleX);
+  const mmVpH = Math.min(MINIMAP_H, (viewport.h / zoom) * mmScaleY);
+  const mmVpX = (viewport.scrollLeft / zoom) * mmScaleX;
+  const mmVpY = (viewport.scrollTop / zoom) * mmScaleY;
+
   return (
-    <div className="relative w-full h-full flex flex-col">
+    <div className="relative w-full h-full flex flex-col min-h-0">
 
       {/* Zoom controls */}
       <div className="absolute top-3 right-3 z-10 flex items-center gap-1"
@@ -519,13 +570,81 @@ export function FamilyTree({
         </button>
       </div>
 
+      {/* Mini-map — interactive */}
+      <div
+        className="absolute bottom-4 right-3 z-10 rounded-xl overflow-hidden print:hidden"
+        style={{
+          width: MINIMAP_W, height: MINIMAP_H,
+          background: 'var(--card)', border: '1px solid var(--border)',
+          opacity: 0.92, cursor: 'crosshair',
+        }}
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          const rect = e.currentTarget.getBoundingClientRect();
+          const clickX = e.clientX - rect.left;
+          const clickY = e.clientY - rect.top;
+          // Jump scroll to clicked position (center viewport on click)
+          const el = scrollRef.current;
+          if (!el) return;
+          const targetScrollLeft = (clickX / mmScaleX - viewport.w / zoom / 2) * zoom;
+          const targetScrollTop  = (clickY / mmScaleY - viewport.h / zoom / 2) * zoom;
+          el.scrollTo({ left: targetScrollLeft, top: targetScrollTop, behavior: 'smooth' });
+          // Start drag on minimap
+          mmDragRef.current = { startX: e.clientX, startY: e.clientY, initSL: targetScrollLeft, initST: targetScrollTop };
+        }}
+        onMouseMove={(e) => {
+          if (!mmDragRef.current) return;
+          e.stopPropagation();
+          const el = scrollRef.current;
+          if (!el) return;
+          const dx = (e.clientX - mmDragRef.current.startX) / mmScaleX * zoom;
+          const dy = (e.clientY - mmDragRef.current.startY) / mmScaleY * zoom;
+          el.scrollLeft = mmDragRef.current.initSL + dx;
+          el.scrollTop  = mmDragRef.current.initST + dy;
+        }}
+        onMouseUp={() => { mmDragRef.current = null; }}
+        onMouseLeave={() => { mmDragRef.current = null; }}
+      >
+        <svg width={MINIMAP_W} height={MINIMAP_H} style={{ display: 'block' }}>
+          {[...layout.layouts.values()].map(({ treeNode, avatarCX, y }) => (
+            <circle
+              key={treeNode.member.id}
+              cx={avatarCX * mmScaleX}
+              cy={y * mmScaleY}
+              r={2.5}
+              fill={
+                treeNode.member.id === highlight?.foundId ? 'var(--accent)' :
+                highlight?.highlightedIds.has(treeNode.member.id) ? 'var(--green)' :
+                treeNode.member.gender === 'male' ? 'var(--blue)' : '#ec4899'
+              }
+              opacity={highlight?.highlightedIds.size && !highlight.highlightedIds.has(treeNode.member.id) && treeNode.member.id !== highlight.foundId ? 0.2 : 0.85}
+            />
+          ))}
+          {/* Viewport rect */}
+          <rect
+            x={Math.max(0, mmVpX)} y={Math.max(0, mmVpY)}
+            width={Math.min(MINIMAP_W - Math.max(0, mmVpX), mmVpW)}
+            height={Math.min(MINIMAP_H - Math.max(0, mmVpY), mmVpH)}
+            fill="rgba(108,99,255,0.1)" stroke="var(--accent)" strokeWidth={1.5}
+            rx={2} style={{ pointerEvents: 'none' }}
+          />
+        </svg>
+      </div>
+
       {/* Scrollable canvas */}
-      <div ref={scrollRef} className="tree-scroll-container flex-1"
-        style={{ overflow: 'auto', position: 'relative' }}
+      <div
+        ref={scrollRef}
+        className="tree-scroll-container flex-1"
+        style={{ overflow: 'auto', position: 'relative', cursor: 'grab' }}
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
+        onMouseUp={onMouseUp}
+        onMouseLeave={onMouseUp}
         onDoubleClick={(e) => {
           if ((e.target as HTMLElement).closest('.tree-node')) return;
           onClearHighlight();
-        }}>
+        }}
+      >
         <div
           className="tree-zoom-canvas"
           style={{

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { PhotoProvider } from '@/contexts/PhotoContext';
 
 export const metadata: Metadata = {
   title: 'The Living Archive — Silsilah Keluarga',
@@ -9,7 +10,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="id">
-      <body className="noise-bg">{children}</body>
+      <body className="noise-bg">
+        <PhotoProvider>{children}</PhotoProvider>
+      </body>
     </html>
   );
 }

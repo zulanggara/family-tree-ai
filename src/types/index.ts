@@ -28,6 +28,7 @@ export interface FamilyData {
 }
 
 export type SearchMode = 'descendants' | 'ancestors';
+export type ViewMode = 'tree' | 'timeline';
 
 export interface TreeNode {
   member: FamilyMember;

@@ -156,6 +156,59 @@ export function buildTree(members: FamilyMember[], memberMap: Map<string, Family
   return rootMembers.map(r => buildNode(r, 0));
 }
 
+export function findRelationPath(
+  fromId: string,
+  toId: string,
+  memberMap: Map<string, FamilyMember>
+): string[] | null {
+  if (fromId === toId) return [fromId];
+  const queue: string[][] = [[fromId]];
+  const visited = new Set<string>([fromId]);
+  while (queue.length > 0) {
+    const path = queue.shift()!;
+    const currentId = path[path.length - 1];
+    const member = memberMap.get(currentId);
+    if (!member) continue;
+    const neighbors = [
+      ...member.childrenIds,
+      ...(member.fatherId ? [member.fatherId] : []),
+      ...(member.motherId ? [member.motherId] : []),
+      ...getSpouseIds(member),
+    ];
+    for (const nid of neighbors) {
+      if (nid === toId) return [...path, nid];
+      if (!visited.has(nid)) {
+        visited.add(nid);
+        queue.push([...path, nid]);
+      }
+    }
+  }
+  return null;
+}
+
+export function computeGenerationMap(
+  members: FamilyMember[],
+  memberMap: Map<string, FamilyMember>
+): Map<string, number> {
+  const genMap = new Map<string, number>();
+  const roots = members.filter(m => !m.fatherId && !m.motherId);
+  const queue: [string, number][] = roots.map(r => [r.id, 0]);
+  while (queue.length > 0) {
+    const [id, gen] = queue.shift()!;
+    if (genMap.has(id)) continue;
+    genMap.set(id, gen);
+    const member = memberMap.get(id);
+    if (!member) continue;
+    for (const childId of member.childrenIds) {
+      if (!genMap.has(childId)) queue.push([childId, gen + 1]);
+    }
+    for (const spouseId of getSpouseIds(member)) {
+      if (!genMap.has(spouseId)) genMap.set(spouseId, gen);
+    }
+  }
+  return genMap;
+}
+
 export function formatDate(dateStr?: string | null): string {
   if (!dateStr) return '';
   const d = new Date(dateStr);

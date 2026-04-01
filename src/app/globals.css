@@ -25,6 +25,25 @@
   --node-size-mobile: 64px;
 }
 
+:root.light {
+  --bg: #f5f4fb;
+  --card: #ffffff;
+  --card-hover: #f0eeff;
+  --border: #ddd9f5;
+  --border-light: #c9c3f0;
+  --accent: #5b52e8;
+  --accent-dim: rgba(91, 82, 232, 0.1);
+  --green: #16a34a;
+  --green-dim: rgba(22, 163, 74, 0.1);
+  --blue: #2563eb;
+  --blue-dim: rgba(37, 99, 235, 0.1);
+  --gold: #d97706;
+  --text: #18181b;
+  --text-muted: #52525b;
+  --text-subtle: #71717a;
+  --connector: #c9c3f0;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -177,4 +196,42 @@ body {
 .tree-zoom-canvas {
   transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   will-change: transform;
+}
+
+/* ── Print styles ──────────────────────────────────────────────────────────── */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  :root {
+    --bg: #ffffff;
+    --card: #f8f8f8;
+    --border: #e0e0e0;
+    --border-light: #cccccc;
+    --text: #111111;
+    --text-muted: #444444;
+    --text-subtle: #666666;
+    --connector: #aaaaaa;
+  }
+
+  .print\:hidden { display: none !important; }
+
+  header, footer, nav { display: none !important; }
+
+  .tree-scroll-container {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  .tree-zoom-canvas {
+    transform: none !important;
+    width: 100% !important;
+    min-width: unset !important;
+  }
+
+  .modal-backdrop { display: none !important; }
 }
