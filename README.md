@@ -348,6 +348,20 @@ Status pernikahan yang valid: `married` | `widowed` | `divorced` | `separated` |
 
 ---
 
+## AI Development
+
+Proyek ini dikembangkan dengan bantuan **[Claude Code](https://claude.ai/code)** — CLI resmi dari Anthropic.
+
+| | |
+|---|---|
+| Model | Claude Sonnet 4.6 (`claude-sonnet-4-6`) |
+| Tool | Claude Code (Anthropic CLI) |
+| Scope | Arsitektur, implementasi fitur, debugging, refactoring |
+
+> Untuk melihat total token yang digunakan, buka [console.anthropic.com](https://console.anthropic.com) → **Usage**.
+
+---
+
 ## Lisensi
 
 MIT
