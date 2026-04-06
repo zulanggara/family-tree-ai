@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { FamilyMember, Marriage } from '@/types';
 import { formatDate, getAge, getAvatarUrl, getMarriage, getSpouseIds,
          getMarriageStatusLabel, getMarriageStatusColor, isActiveMarriage } from '@/lib/family';
@@ -7,6 +8,7 @@ import { InfoCard } from '@/components/ui/InfoCard';
 import { SectionLabel } from '@/components/ui/SectionLabel';
 import { RelationChip } from '@/components/ui/RelationChip';
 import { Avatar } from '@/components/ui/Avatar';
+import { GalleryLightbox } from '@/components/GalleryLightbox';
 
 interface DetailModalProps {
   member: FamilyMember;
@@ -16,6 +18,8 @@ interface DetailModalProps {
 }
 
 export function DetailModal({ member, memberMap, onClose, onNavigate }: DetailModalProps) {
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+  const gallery = member.gallery ?? [];
   const father = member.fatherId ? memberMap.get(member.fatherId) : null;
   const mother = member.motherId ? memberMap.get(member.motherId) : null;
   const spouseIds = getSpouseIds(member);
@@ -31,6 +35,7 @@ export function DetailModal({ member, memberMap, onClose, onNavigate }: DetailMo
     : null;
 
   return (
+    <>
     <div
       className="modal-backdrop fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       style={{ backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
@@ -128,6 +133,33 @@ export function DetailModal({ member, memberMap, onClose, onNavigate }: DetailMo
               </div>
             )}
 
+            {/* Gallery */}
+            {gallery.length > 0 && (
+              <div className="mb-4 rounded-lg p-3" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                <SectionLabel>Galeri Foto ({gallery.length})</SectionLabel>
+                <div className="grid grid-cols-3 gap-1.5 mt-2">
+                  {gallery.map((url, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setLightboxIdx(i)}
+                      className="rounded-lg overflow-hidden transition-all hover:opacity-90 hover:scale-[1.02]"
+                      style={{ aspectRatio: '1', background: 'var(--card)', border: '1px solid var(--border)' }}
+                    >
+                      <img
+                        src={url}
+                        alt={`Foto ${i + 1}`}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        onError={e => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Social links */}
             {member.socialLinks && member.socialLinks.length > 0 && (
               <div className="mb-4 rounded-lg p-3" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
@@ -206,6 +238,16 @@ export function DetailModal({ member, memberMap, onClose, onNavigate }: DetailMo
         </div>
       </div>
     </div>
+
+    {/* Gallery lightbox */}
+    {lightboxIdx !== null && (
+      <GalleryLightbox
+        images={gallery}
+        initialIndex={lightboxIdx}
+        onClose={() => setLightboxIdx(null)}
+      />
+    )}
+    </>
   );
 }
 

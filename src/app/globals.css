@@ -198,6 +198,49 @@ body {
   will-change: transform;
 }
 
+/* ── Accessibility overrides ───────────────────────────────────────────────── */
+
+/* High contrast */
+html.high-contrast {
+  --bg: #000000;
+  --card: #111111;
+  --card-hover: #1a1a1a;
+  --border: #555555;
+  --border-light: #777777;
+  --text: #ffffff;
+  --text-muted: #dddddd;
+  --text-subtle: #bbbbbb;
+  --connector: #888888;
+}
+html.high-contrast.light {
+  --bg: #ffffff;
+  --card: #f0f0f0;
+  --border: #333333;
+  --border-light: #555555;
+  --text: #000000;
+  --text-muted: #111111;
+  --text-subtle: #333333;
+  --connector: #444444;
+}
+
+/* Hide images */
+html.hide-images img {
+  display: none !important;
+}
+html.hide-images .node-avatar {
+  background: var(--card) !important;
+}
+
+/* No animations */
+html.no-animations *,
+html.no-animations *::before,
+html.no-animations *::after {
+  animation-duration: 0.001ms !important;
+  animation-delay: 0.001ms !important;
+  transition-duration: 0.001ms !important;
+  transition-delay: 0.001ms !important;
+}
+
 /* ── Print styles ──────────────────────────────────────────────────────────── */
 @media print {
   body {

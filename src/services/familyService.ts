@@ -1,30 +1,34 @@
 /**
- * Family data service.
+ * Family data service — single entry point for all data consumers.
  *
- * Currently reads from a local JSON file. To switch to a backend API:
- *   1. Set USE_LOCAL = false
- *   2. Set NEXT_PUBLIC_API_URL in your .env (e.g. http://localhost:3001)
- *   3. Make sure the API returns the same FamilyData shape:
- *      GET /api/family  → { members: FamilyMember[] }
+ * Data source is controlled by the env var NEXT_PUBLIC_DATA_SOURCE:
+ *   "local"  → reads from data/family.json  (default, no DB required)
+ *   "api"    → fetches from Next.js API route /api/family → Supabase
  *
- * All consumers call getFamilyData() — no other change needed.
+ * To switch to the database:
+ *   Add  NEXT_PUBLIC_DATA_SOURCE=api  to your .env.local (and to Vercel env vars).
+ *
+ * Nothing else needs to change — all components call getFamilyData() unchanged.
  */
 
 import { FamilyData } from '@/types';
 
-const USE_LOCAL = true;
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
+const USE_LOCAL = (process.env.NEXT_PUBLIC_DATA_SOURCE ?? 'local') === 'local';
 
 export async function getFamilyData(): Promise<FamilyData> {
   if (USE_LOCAL) {
-    // Dynamic import keeps this tree-shakeable when USE_LOCAL is false
     const local = await import('../../data/family.json');
     return local.default as FamilyData;
   }
 
-  const res = await fetch(`${API_URL}/api/family`, {
-    next: { revalidate: 60 }, // Next.js ISR — refetch at most every 60 s
-  });
-  if (!res.ok) throw new Error(`Failed to fetch family data: ${res.status}`);
+  // Relative URL works both in the browser and in server-side fetch (Next.js).
+  // In browser:  /api/family
+  // In Node SSR: needs full URL, but this service is only called client-side
+  //              via useFamilyData hook, so relative is fine.
+  const res = await fetch('/api/family', { cache: 'no-store' });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `GET /api/family failed: ${res.status}`);
+  }
   return res.json() as Promise<FamilyData>;
 }

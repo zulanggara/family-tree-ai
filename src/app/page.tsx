@@ -17,6 +17,7 @@ import { BirthdayPanel } from '@/components/BirthdayPanel';
 import { StatsPanel } from '@/components/StatsPanel';
 import { TimelineView } from '@/components/TimelineView';
 import { usePhoto } from '@/contexts/PhotoContext';
+import { AccessibilityPanel } from '@/components/AccessibilityPanel';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function collectSubtreeIds(node: TreeNode): Set<string> {
@@ -210,6 +211,7 @@ function HomePageInner() {
   const [viewMode, setViewMode] = useState<ViewMode>('tree');
   const [showBirthdays, setShowBirthdays] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showA11y, setShowA11y] = useState(false);
   const [relationMode, setRelationMode] = useState(false);
   const [relationFrom, setRelationFrom] = useState<FamilyMember | null>(null);
   const [relationPath, setRelationPath] = useState<string[] | null>(null);
@@ -349,6 +351,7 @@ function HomePageInner() {
   // ── LIST VIEW ───────────────────────────────────────────────────────────────
   if (!activeRootId) {
     return (
+      <>
       <div className="flex flex-col min-h-screen" style={{ background: 'var(--bg)' }}>
         <header className="border-b px-4 sm:px-6 py-4" style={{
           borderColor: 'var(--border)', background: 'var(--card)', backdropFilter: 'blur(12px)',
@@ -366,7 +369,22 @@ function HomePageInner() {
                 <p className="text-[10px] text-[var(--text-subtle)] leading-none mt-0.5">Silsilah Keluarga</p>
               </div>
             </div>
-            <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setShowA11y(true)}
+                title="Pengaturan aksesibilitas"
+                className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
+                style={{ border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--text)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+              >
+                <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <circle cx="12" cy="5" r="2" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5M8 10h8M9 17l-1 5M15 17l1 5" />
+                </svg>
+              </button>
+              <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
+            </div>
           </div>
         </header>
 
@@ -419,6 +437,8 @@ function HomePageInner() {
           </div>
         </main>
       </div>
+      {showA11y && <AccessibilityPanel onClose={() => setShowA11y(false)} />}
+      </>
     );
   }
 
@@ -527,6 +547,21 @@ function HomePageInner() {
               </svg>
             </button>
 
+            {/* Accessibility */}
+            <button onClick={() => setShowA11y(a => !a)}
+              title="Pengaturan aksesibilitas"
+              className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
+              style={{
+                background: showA11y ? 'var(--accent-dim)' : 'transparent',
+                border: `1px solid ${showA11y ? 'var(--accent)' : 'var(--border)'}`,
+                color: showA11y ? 'var(--accent)' : 'var(--text-muted)',
+              }}>
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <circle cx="12" cy="5" r="2" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5M8 10h8M9 17l-1 5M15 17l1 5" />
+              </svg>
+            </button>
+
             {/* Theme toggle */}
             <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
           </div>
@@ -628,6 +663,7 @@ function HomePageInner() {
       {showStats && (
         <StatsPanel members={activeMembers} onClose={() => setShowStats(false)} />
       )}
+      {showA11y && <AccessibilityPanel onClose={() => setShowA11y(false)} />}
 
       {/* Detail Modal */}
       {selectedMember && (

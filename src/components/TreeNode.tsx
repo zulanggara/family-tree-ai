@@ -155,6 +155,12 @@ function NodeAvatar({ member, highlight, onClick, nodeRef, marriageStatus, isAct
           style={{ maxWidth: 80, wordBreak: 'break-word' }}>
           {member.name}
         </p>
+        {member.nickname && (
+          <p className="text-[9px] leading-tight mt-0.5 italic"
+            style={{ maxWidth: 80, color: 'var(--text-subtle)', opacity: 0.6 }}>
+            "{member.nickname}"
+          </p>
+        )}
         <p className="text-[10px] text-[var(--text-subtle)] mt-0.5">
           {getAge(member.birthDate, member.deathDate)}
         </p>

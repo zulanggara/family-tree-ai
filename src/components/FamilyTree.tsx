@@ -4,14 +4,14 @@ import { useRef, useEffect, useState } from 'react';
 import { FamilyMember, TreeNode, HighlightState, MarriageStatus } from '@/types';
 import { getAge, getAvatarUrl, isActiveMarriage, getMarriageStatusLabel, getMarriageStatusColor } from '@/lib/family';
 import { usePhoto } from '@/contexts/PhotoContext';
+import { useAccessibility, NODE_SIZES, LINE_WIDTHS } from '@/contexts/AccessibilityContext';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-const NODE_W = 90;
-const AVATAR = 72;
+// ─── Fixed layout constants ───────────────────────────────────────────────────
 const SIBLING_GAP = 70;
-const LEVEL_H = 220;
 const PADDING = 80;
 const COUPLE_CONNECTOR = 32;
+
+// Dynamic constants come from accessibility context — see inside FamilyTree component.
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type HighlightType = 'self' | 'green' | 'blue' | 'dimmed' | 'none';
@@ -41,49 +41,45 @@ interface CrossConnection {
 }
 
 // ─── Layout engine ────────────────────────────────────────────────────────────
-function nodeUnitWidth(node: TreeNode): number {
-  // Tampilkan 1 pasangan inline (aktif maupun tidak) agar tidak ada yang hilang dari pohon
+interface Sz { w: number; av: number }
+
+function nodeUnitWidth(node: TreeNode, sz: Sz): number {
   const hasSpouse = node.spouseMarriages.length > 0;
-  return NODE_W + (hasSpouse ? NODE_W + COUPLE_CONNECTOR : 0);
+  return sz.w + (hasSpouse ? sz.w + COUPLE_CONNECTOR : 0);
 }
 
-function subtreeWidth(node: TreeNode): number {
-  if (node.children.length === 0) return nodeUnitWidth(node);
+function subtreeWidth(node: TreeNode, sz: Sz): number {
+  if (node.children.length === 0) return nodeUnitWidth(node, sz);
   const childrenTotalW = node.children.reduce(
-    (s, c) => s + subtreeWidth(c) + SIBLING_GAP, -SIBLING_GAP
+    (s, c) => s + subtreeWidth(c, sz) + SIBLING_GAP, -SIBLING_GAP
   );
-  return Math.max(nodeUnitWidth(node), childrenTotalW);
+  return Math.max(nodeUnitWidth(node, sz), childrenTotalW);
 }
 
-function buildLayout(roots: TreeNode[]): {
+function buildLayout(roots: TreeNode[], sz: Sz): {
   layouts: Map<string, LayoutNode>;
   totalW: number;
   totalH: number;
 } {
+  const LEVEL_H = sz.av + 148;
   const layouts = new Map<string, LayoutNode>();
 
   function place(node: TreeNode, x: number, y: number) {
-    const avatarCX = x + AVATAR / 2;
-
-    // Midpoint antara dua pasangan → titik anchor koneksi ke anak
-    // Gunakan semua pasangan (aktif maupun tidak) agar layout konsisten
+    const avatarCX = x + sz.av / 2;
     const hasSpouseDisplay = node.spouseMarriages.length > 0;
-    const spouseCX = x + NODE_W + COUPLE_CONNECTOR + AVATAR / 2;
+    const spouseCX = x + sz.w + COUPLE_CONNECTOR + sz.av / 2;
     const childAnchorCX = hasSpouseDisplay ? (avatarCX + spouseCX) / 2 : avatarCX;
 
-    layouts.set(node.member.id, { treeNode: node, x, y, avatarCX, childAnchorCX, branchY: y + AVATAR + 20 });
+    layouts.set(node.member.id, { treeNode: node, x, y, avatarCX, childAnchorCX, branchY: y + sz.av + 20 });
 
     if (node.children.length > 0) {
       const childrenTotalW = node.children.reduce(
-        (s, c) => s + subtreeWidth(c) + SIBLING_GAP, -SIBLING_GAP
+        (s, c) => s + subtreeWidth(c, sz) + SIBLING_GAP, -SIBLING_GAP
       );
-      // Center children under the midpoint of the full allocated subtree width.
-      // Using childAnchorCX (couple midpoint, offset from x) causes children to
-      // overflow the allocated space and overlap with siblings.
-      const layoutCenterX = x + subtreeWidth(node) / 2;
+      const layoutCenterX = x + subtreeWidth(node, sz) / 2;
       let childX = layoutCenterX - childrenTotalW / 2;
       for (const child of node.children) {
-        const w = subtreeWidth(child);
+        const w = subtreeWidth(child, sz);
         place(child, childX, y + LEVEL_H);
         childX += w + SIBLING_GAP;
       }
@@ -93,7 +89,7 @@ function buildLayout(roots: TreeNode[]): {
   let cursorX = PADDING;
   for (const root of roots) {
     place(root, cursorX, PADDING);
-    cursorX += subtreeWidth(root) + SIBLING_GAP * 2;
+    cursorX += subtreeWidth(root, sz) + SIBLING_GAP * 2;
   }
 
   let minX = Infinity;
@@ -109,8 +105,8 @@ function buildLayout(roots: TreeNode[]): {
 
   let maxX = 0, maxY = 0;
   for (const l of layouts.values()) {
-    maxX = Math.max(maxX, l.x + nodeUnitWidth(l.treeNode));
-    maxY = Math.max(maxY, l.y + AVATAR + 60);
+    maxX = Math.max(maxX, l.x + nodeUnitWidth(l.treeNode, sz));
+    maxY = Math.max(maxY, l.y + sz.av + 60);
   }
 
   return { layouts, totalW: maxX + PADDING, totalH: maxY + PADDING };
@@ -119,13 +115,14 @@ function buildLayout(roots: TreeNode[]): {
 // ─── Connection builder ───────────────────────────────────────────────────────
 function buildConnections(
   layouts: Map<string, LayoutNode>,
-  highlight: HighlightState | null
+  highlight: HighlightState | null,
+  sz: Sz
 ): Connection[] {
   const conns: Connection[] = [];
   for (const [parentId, layout] of layouts) {
     const { treeNode, childAnchorCX, y } = layout;
     const fromX = childAnchorCX; // keluar dari midpoint pasangan, bukan hanya primary
-    const fromY = y + AVATAR;
+    const fromY = y + sz.av;
 
     for (const child of treeNode.children) {
       const childLayout = layouts.get(child.member.id);
@@ -150,7 +147,7 @@ function buildConnections(
 }
 
 // Detect pairs where both spouses appear as primary layout nodes (cross-family marriages).
-function buildCrossConnections(layouts: Map<string, LayoutNode>): CrossConnection[] {
+function buildCrossConnections(layouts: Map<string, LayoutNode>, sz: Sz): CrossConnection[] {
   const seen = new Set<string>();
   const result: CrossConnection[] = [];
   for (const [id, layout] of layouts) {
@@ -162,9 +159,9 @@ function buildCrossConnections(layouts: Map<string, LayoutNode>): CrossConnectio
         const sl = layouts.get(spouse.id)!;
         result.push({
           x1: layout.avatarCX,
-          y1: layout.y + AVATAR / 2,
+          y1: layout.y + sz.av / 2,
           x2: sl.avatarCX,
-          y2: sl.y + AVATAR / 2,
+          y2: sl.y + sz.av / 2,
         });
       }
     }
@@ -197,7 +194,7 @@ const STATUS_COLOR: Record<MarriageStatus, string> = {
 
 // ─── NodeAvatar — single/double click ────────────────────────────────────────
 function NodeAvatar({
-  member, highlight, onClick, onDoubleClick, nodeRef, faded,
+  member, highlight, onClick, onDoubleClick, nodeRef, faded, sz,
 }: {
   member: FamilyMember;
   highlight: HighlightType;
@@ -205,6 +202,7 @@ function NodeAvatar({
   onDoubleClick: () => void;
   nodeRef?: (el: HTMLDivElement | null) => void;
   faded?: boolean;
+  sz: Sz;
 }) {
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { getPhoto } = usePhoto();
@@ -237,13 +235,13 @@ function NodeAvatar({
       ref={nodeRef}
       data-member-id={member.id}
       className={`tree-node ${hlClass} flex flex-col items-center cursor-pointer group`}
-      style={{ width: NODE_W, opacity: faded ? 0.65 : 1 }}
+      style={{ width: sz.w, opacity: faded ? 0.65 : 1 }}
       onClick={handleClick}
     >
       <div className="relative">
         <div
           className="node-avatar rounded-full overflow-hidden transition-all duration-300"
-          style={{ width: AVATAR, height: AVATAR, border: `2.5px solid ${ringColor}` }}
+          style={{ width: sz.av, height: sz.av, border: `2.5px solid ${ringColor}` }}
         >
           <img
             src={getPhoto(member.id, getAvatarUrl(member))}
@@ -261,7 +259,7 @@ function NodeAvatar({
           <div className="absolute" style={{
             width: 10, height: 10, borderRadius: '50%',
             background: 'var(--green)', border: '2px solid var(--bg)',
-            top: 56, left: 54,
+            top: sz.av - 16, left: sz.av - 18,
           }} />
         )}
         {!isAlive && (
@@ -273,7 +271,7 @@ function NodeAvatar({
       </div>
       <div className="mt-2 text-center px-1">
         <p className="text-xs font-medium text-[var(--text)] leading-tight line-clamp-2"
-          style={{ maxWidth: 82, wordBreak: 'break-word' }}>
+          style={{ maxWidth: sz.w - 8, wordBreak: 'break-word' }}>
           {member.name}
         </p>
         <p className="text-[10px] text-[var(--text-subtle)] mt-0.5 leading-tight">
@@ -286,7 +284,7 @@ function NodeAvatar({
 
 // ─── TreeNodeRow ──────────────────────────────────────────────────────────────
 function TreeNodeRow({
-  treeNode, highlight, onClick, onDoubleClick, nodeRef, onShowSpouses,
+  treeNode, highlight, onClick, onDoubleClick, nodeRef, onShowSpouses, sz,
 }: {
   treeNode: TreeNode;
   highlight: HighlightState | null;
@@ -294,13 +292,12 @@ function TreeNodeRow({
   onDoubleClick: (m: FamilyMember) => void;
   nodeRef: (el: HTMLDivElement | null) => void;
   onShowSpouses: (m: FamilyMember) => void;
+  sz: Sz;
 }) {
   const { member, spouses, spouseMarriages } = treeNode;
   const memberHL = getHL(member.id, highlight);
   const hasMultipleMarriages = spouseMarriages.length > 1;
 
-  // Tampilkan pasangan aktif dulu; jika tidak ada, tampilkan pasangan pertama (widowed/divorced)
-  // sehingga tidak ada anggota yang hilang dari pohon silsilah
   const displaySpouseIdx = (() => {
     const activeIdx = spouseMarriages.findIndex(m => isActiveMarriage(m));
     if (activeIdx >= 0) return activeIdx;
@@ -315,6 +312,7 @@ function TreeNodeRow({
         onClick={() => onClick(member)}
         onDoubleClick={() => onDoubleClick(member)}
         nodeRef={nodeRef}
+        sz={sz}
       />
 
       {displaySpouseIdx >= 0 && spouses[displaySpouseIdx] && (() => {
@@ -326,7 +324,7 @@ function TreeNodeRow({
         const icon = STATUS_ICON[status];
         return (
           <div className="flex items-start">
-            <div style={{ width: COUPLE_CONNECTOR, paddingTop: AVATAR / 2 - 8 }}>
+            <div style={{ width: COUPLE_CONNECTOR, paddingTop: sz.av / 2 - 8 }}>
               <svg width={COUPLE_CONNECTOR} height="16" viewBox={`0 0 ${COUPLE_CONNECTOR} 16`}>
                 <line x1="0" y1="8" x2={COUPLE_CONNECTOR} y2="8"
                   stroke={color} strokeWidth="1.5"
@@ -341,6 +339,7 @@ function TreeNodeRow({
               onClick={() => onClick(spouse)}
               onDoubleClick={() => onDoubleClick(spouse)}
               faded={!isActive}
+              sz={sz}
             />
           </div>
         );
@@ -352,7 +351,7 @@ function TreeNodeRow({
           className="self-start flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium transition-all hover:opacity-80"
           style={{
             background: 'var(--accent-dim)', border: '1px solid var(--accent)',
-            color: 'var(--accent)', marginTop: AVATAR / 2 - 8, marginLeft: 4,
+            color: 'var(--accent)', marginTop: sz.av / 2 - 8, marginLeft: 4,
           }}
           title="Lihat semua riwayat pernikahan"
         >
@@ -507,14 +506,19 @@ export function FamilyTree({
   const [spousePanelMember, setSpousePanelMember] = useState<FamilyMember | null>(null);
   const [viewport, setViewport] = useState({ scrollLeft: 0, scrollTop: 0, w: 0, h: 0 });
 
+  // Accessibility settings
+  const { settings } = useAccessibility();
+  const sz: Sz = NODE_SIZES[settings.nodeSize];
+  const lineW = LINE_WIDTHS[settings.lineThickness];
+
   // Drag-to-pan state
   const dragRef = useRef<{ startX: number; startY: number; sl: number; st: number } | null>(null);
   // Mini-map drag state
   const mmDragRef = useRef<{ startX: number; startY: number; initSL: number; initST: number } | null>(null);
 
   useEffect(() => {
-    setLayout(buildLayout(roots));
-  }, [roots]);
+    setLayout(buildLayout(roots, sz));
+  }, [roots, settings.nodeSize]); // re-layout when node size changes
 
   useEffect(() => {
     if (!focusId || !scrollRef.current || !layout) return;
@@ -523,7 +527,7 @@ export function FamilyTree({
     const c = scrollRef.current;
     c.scrollTo({
       left: l.avatarCX * zoom - c.clientWidth / 2,
-      top: l.y * zoom - c.clientHeight / 2 + (AVATAR * zoom) / 2,
+      top: l.y * zoom - c.clientHeight / 2 + (sz.av * zoom) / 2,
       behavior: 'smooth',
     });
   }, [focusId, layout, zoom]);
@@ -560,8 +564,8 @@ export function FamilyTree({
     if (scrollRef.current) scrollRef.current.style.cursor = '';
   };
 
-  const connections = layout ? buildConnections(layout.layouts, highlight) : [];
-  const crossConnections = layout ? buildCrossConnections(layout.layouts) : [];
+  const connections = layout ? buildConnections(layout.layouts, highlight, sz) : [];
+  const crossConnections = layout ? buildCrossConnections(layout.layouts, sz) : [];
 
   if (!layout) return (
     <div className="flex items-center justify-center h-64 text-[var(--text-subtle)]">
@@ -712,7 +716,7 @@ export function FamilyTree({
                   d={connPath(conn)}
                   fill="none"
                   stroke={conn.isHighlighted ? conn.highlightColor : 'var(--connector)'}
-                  strokeWidth={conn.isHighlighted ? 3 : 1.5}
+                  strokeWidth={conn.isHighlighted ? lineW * 2 : lineW}
                   strokeLinecap="round"
                   opacity={dimmed ? 0.25 : 1}
                   style={{ transition: 'stroke 0.3s, stroke-width 0.3s, opacity 0.3s' }}
@@ -748,6 +752,7 @@ export function FamilyTree({
                   onDoubleClick={onNodeDoubleClick}
                   nodeRef={(el) => { if (el) nodeRefs.current.set(treeNode.member.id, el); }}
                   onShowSpouses={setSpousePanelMember}
+                  sz={sz}
                 />
               </div>
             ))}

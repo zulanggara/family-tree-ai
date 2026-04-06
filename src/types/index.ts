@@ -29,6 +29,7 @@ export interface FamilyMember {
   nationality?: string;
   hobbies?: string[];
   socialLinks?: { label: string; url: string }[];
+  gallery?: string[];
 }
 
 export interface FamilyData {
