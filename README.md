@@ -104,6 +104,10 @@ SESSION_SECRET="ganti-dengan-string-acak-panjang"
 
 # Data source: "local" = dari file JSON | "api" = dari PostgreSQL
 NEXT_PUBLIC_DATA_SOURCE="api"
+
+# Aktifkan fitur Audit Logs (hanya tampil untuk super_admin)
+# "true" = aktif | nilai lain / tidak diset = nonaktif
+NEXT_PUBLIC_AUDIT_LOGS_ENABLED="true"
 ```
 
 > ⚠️ **Jangan commit `.env.local`** — sudah ada di `.gitignore`
@@ -157,6 +161,7 @@ Panel admin: [http://localhost:3000/admin](http://localhost:3000/admin)
    - `DATABASE_URL` — connection string PostgreSQL (Supabase, Neon, Railway, dll)
    - `SESSION_SECRET` — string acak panjang (min 32 karakter)
    - `NEXT_PUBLIC_DATA_SOURCE` = `api`
+   - `NEXT_PUBLIC_AUDIT_LOGS_ENABLED` = `true` _(opsional, default: nonaktif)_
 4. Deploy
 
 ### Rekomendasi PostgreSQL hosting

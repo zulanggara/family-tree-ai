@@ -185,7 +185,7 @@ function getHL(memberId: string, highlight: HighlightState | null): HighlightTyp
 
 // ─── Status visuals ───────────────────────────────────────────────────────────
 const STATUS_ICON: Record<MarriageStatus, string> = {
-  married: '♥', widowed: '✝', divorced: '÷', separated: '~', annulled: '✕',
+  married: '♥', widowed: '🪦', divorced: '÷', separated: '~', annulled: '✕',
 };
 const STATUS_COLOR: Record<MarriageStatus, string> = {
   married: '#22c55e', widowed: '#9ca3af', divorced: '#f59e0b',
@@ -265,7 +265,10 @@ function NodeAvatar({
         {!isAlive && (
           <div className="absolute inset-0 rounded-full flex items-end justify-center pb-0.5"
             style={{ pointerEvents: 'none' }}>
-            <span style={{ fontSize: 9, color: '#9ca3af' }}>✝</span>
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="#9ca3af">
+              <path d="M7 21V11a5 5 0 0110 0v10H7z" />
+              <rect x="5" y="21" width="14" height="2" rx="1" />
+            </svg>
           </div>
         )}
       </div>

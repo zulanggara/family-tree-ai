@@ -1,4 +1,4 @@
-import { fetchFamilyData, getDescendantIds } from '@/lib/db/familyRepository';
+import { fetchFamilyData, getDescendantAndSpouseIds } from '@/lib/db/familyRepository';
 import Link from 'next/link';
 import { MembersTable } from '@/components/admin/MembersTable';
 import { getServerSession } from '@/lib/session';
@@ -11,7 +11,7 @@ export default async function MembersPage() {
 
   let visible = members;
   if (session?.role === 'family_admin' && session.rootFamilyId) {
-    const allowedIds = new Set(await getDescendantIds(session.rootFamilyId));
+    const allowedIds = new Set(await getDescendantAndSpouseIds(session.rootFamilyId));
     visible = members.filter(m => allowedIds.has(m.id));
   }
 

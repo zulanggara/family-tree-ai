@@ -13,6 +13,15 @@ interface AvatarProps {
   allowUpload?: boolean;
 }
 
+function TombstoneIcon({ size = 12 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M7 21V11a5 5 0 0110 0v10H7z" />
+      <rect x="5" y="21" width="14" height="2" rx="1" />
+    </svg>
+  );
+}
+
 export function Avatar({
   member,
   size = 80,
@@ -24,7 +33,7 @@ export function Avatar({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isAlive = !member.deathDate;
   const customPhoto = getPhoto(member.id, '');
-  const fallback = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(member.name)}`;
+  const fallback = getAvatarUrl(member);
 
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
@@ -90,9 +99,9 @@ export function Avatar({
       {showStatusDot && !isAlive && (
         <span
           className="absolute w-5 h-5 rounded-full bg-gray-700 border-2 flex items-center justify-center"
-          style={{ borderColor: 'var(--card)', bottom: -2, right: -2, fontSize: 10, color: '#9ca3af' }}
+          style={{ borderColor: 'var(--card)', bottom: -2, right: -2, color: '#9ca3af' }}
         >
-          ✝
+          <TombstoneIcon size={10} />
         </span>
       )}
     </div>

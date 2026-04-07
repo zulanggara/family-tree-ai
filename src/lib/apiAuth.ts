@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { SessionPayload } from '@/lib/session';
-import { getDescendantIds } from '@/lib/db/familyRepository';
+import { getDescendantAndSpouseIds } from '@/lib/db/familyRepository';
 
 export function getRequestSession(req: NextRequest): SessionPayload | null {
   const raw = req.headers.get('x-session');
@@ -23,10 +23,11 @@ export function getRequestSession(req: NextRequest): SessionPayload | null {
 
 /**
  * Returns allowed member IDs for the session, or null if unrestricted (super_admin / no rootFamilyId).
+ * Includes descendants + their spouses so family_admin can see and manage complete family data.
  */
 export async function getAllowedIds(session: SessionPayload): Promise<Set<string> | null> {
   if (session.role === 'super_admin' || !session.rootFamilyId) return null;
-  const ids = await getDescendantIds(session.rootFamilyId);
+  const ids = await getDescendantAndSpouseIds(session.rootFamilyId);
   return new Set(ids);
 }
 

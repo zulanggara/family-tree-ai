@@ -102,7 +102,10 @@ function MemberCard({
         {!isAlive && (
           <span className="absolute inset-0 rounded-full flex items-end justify-center pb-0.5"
             style={{ pointerEvents: 'none' }}>
-            <span style={{ fontSize: 8, color: '#9ca3af' }}>✝</span>
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="#9ca3af">
+              <path d="M7 21V11a5 5 0 0110 0v10H7z" />
+              <rect x="5" y="21" width="14" height="2" rx="1" />
+            </svg>
           </span>
         )}
       </div>

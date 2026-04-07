@@ -24,7 +24,7 @@ function LoginForm() {
     });
     setLoading(false);
     if (res.ok) {
-      router.push(from);
+      window.location.href = from;
     } else {
       const data = await res.json();
       setError(data.error ?? 'Login gagal');

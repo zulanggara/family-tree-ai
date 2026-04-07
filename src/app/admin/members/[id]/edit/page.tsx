@@ -1,4 +1,4 @@
-import { fetchFamilyData, fetchMemberById, getDescendantIds } from '@/lib/db/familyRepository';
+import { fetchFamilyData, fetchMemberById, getDescendantAndSpouseIds } from '@/lib/db/familyRepository';
 import { MemberForm } from '@/components/admin/MemberForm';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -18,7 +18,7 @@ export default async function EditMemberPage({ params }: { params: Promise<{ id:
 
   // family_admin can only edit members within their descendant scope
   if (session?.role === 'family_admin' && session.rootFamilyId) {
-    const allowedIds = new Set(await getDescendantIds(session.rootFamilyId));
+    const allowedIds = new Set(await getDescendantAndSpouseIds(session.rootFamilyId));
     if (!allowedIds.has(id)) notFound();
   }
 
