@@ -1,4 +1,5 @@
-import { fetchFamilyData } from '@/lib/db/familyRepository';
+import { fetchFamilyData, getDescendantAndSpouseIds } from '@/lib/db/familyRepository';
+import { getServerSession } from '@/lib/session';
 import {
   BirthDeathChart, GenderChart, EducationChart, ProfessionChart,
   ChildrenDistChart, AgeAtDeathChart, GenerationChart, NameWordCloud,
@@ -23,7 +24,16 @@ function countMap(values: (string | undefined | null)[]): Map<string, number> {
 }
 
 export default async function StatsPage() {
-  const { members } = await fetchFamilyData();
+  const [{ members: allMembers }, session] = await Promise.all([
+    fetchFamilyData(),
+    getServerSession(),
+  ]);
+
+  let members = allMembers;
+  if (session?.role === 'family_admin' && session.rootFamilyId) {
+    const allowedIds = new Set(await getDescendantAndSpouseIds(session.rootFamilyId));
+    members = allMembers.filter(m => allowedIds.has(m.id));
+  }
 
   // ── Births & deaths per year ──────────────────────────────────────────────
   const yearlyMap = new Map<number, { lahir: number; wafat: number }>();

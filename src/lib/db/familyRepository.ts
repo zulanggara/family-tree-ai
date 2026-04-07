@@ -180,6 +180,36 @@ export async function getDescendantIds(rootId: string): Promise<string[]> {
   }
 }
 
+/**
+ * Returns all descendant IDs plus the IDs of any spouses of those descendants.
+ * Used for family_admin scope: they can see and manage their family tree AND
+ * the spouses connected to it (even if those spouses come from outside the tree).
+ */
+export async function getDescendantAndSpouseIds(rootId: string): Promise<string[]> {
+  const sql = getDb();
+  try {
+    const rows = await sql<{ id: string }[]>`
+      WITH RECURSIVE desc_tree AS (
+        SELECT id FROM family_members WHERE id = ${rootId}
+        UNION ALL
+        SELECT fm.id FROM family_members fm
+        JOIN desc_tree dt ON fm.father_id = dt.id OR fm.mother_id = dt.id
+      ),
+      spouse_ids AS (
+        SELECT member_id AS id FROM marriages WHERE spouse_id IN (SELECT id FROM desc_tree)
+        UNION
+        SELECT spouse_id AS id FROM marriages WHERE member_id IN (SELECT id FROM desc_tree)
+      )
+      SELECT id FROM desc_tree
+      UNION
+      SELECT id FROM spouse_ids
+    `;
+    return rows.map(r => r.id);
+  } finally {
+    await sql.end();
+  }
+}
+
 export interface DescendantInfo {
   id: string;
   name: string;

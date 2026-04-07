@@ -264,7 +264,7 @@ function MarriageCard({
   const statusLabel = getMarriageStatusLabel(marriage.status);
 
   const STATUS_ICON: Record<string, string> = {
-    married: '♥', widowed: '✝', divorced: '÷', separated: '~', annulled: '✕',
+    married: '♥', widowed: '🪦', divorced: '÷', separated: '~', annulled: '✕',
   };
 
   return (

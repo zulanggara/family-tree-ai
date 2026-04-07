@@ -1,10 +1,20 @@
-import { fetchFamilyData } from '@/lib/db/familyRepository';
+import { fetchFamilyData, getDescendantAndSpouseIds } from '@/lib/db/familyRepository';
+import { getServerSession } from '@/lib/session';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminDashboard() {
-  const { members } = await fetchFamilyData();
+  const [{ members: allMembers }, session] = await Promise.all([
+    fetchFamilyData(),
+    getServerSession(),
+  ]);
+
+  let members = allMembers;
+  if (session?.role === 'family_admin' && session.rootFamilyId) {
+    const allowedIds = new Set(await getDescendantAndSpouseIds(session.rootFamilyId));
+    members = allMembers.filter(m => allowedIds.has(m.id));
+  }
 
   const alive = members.filter(m => !m.deathDate).length;
   const male = members.filter(m => m.gender === 'male').length;

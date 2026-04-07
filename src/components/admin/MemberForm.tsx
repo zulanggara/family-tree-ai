@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { FamilyMember, MarriageStatus } from '@/types';
 import { ConfirmDialog } from './ConfirmDialog';
 import { useToast } from './Toast';
+import { SearchableSelect } from './SearchableSelect';
 
 interface Props {
   /** Existing member when editing; undefined when creating */
@@ -132,8 +133,7 @@ export function MemberForm({ member, allMembers, mode }: Props) {
         );
       }
 
-      router.push('/admin/members');
-      router.refresh();
+      window.location.href = '/admin/members';
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Terjadi kesalahan');
     } finally {
@@ -388,22 +388,18 @@ export function MemberForm({ member, allMembers, mode }: Props) {
       <Section title="Relasi Keluarga">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Ayah">
-            <select value={fatherId} onChange={e => setFatherId(e.target.value)}
-              className={inputCls} style={inputStyle}>
-              <option value="">— Tidak diketahui —</option>
-              {fatherCandidates.map(m => (
-                <option key={m.id} value={m.id}>{m.name} ({m.id})</option>
-              ))}
-            </select>
+            <SearchableSelect
+              value={fatherId}
+              onChange={setFatherId}
+              options={fatherCandidates.map(m => ({ value: m.id, label: `${m.name} (${m.id})` }))}
+            />
           </Field>
           <Field label="Ibu">
-            <select value={motherId} onChange={e => setMotherId(e.target.value)}
-              className={inputCls} style={inputStyle}>
-              <option value="">— Tidak diketahui —</option>
-              {motherCandidates.map(m => (
-                <option key={m.id} value={m.id}>{m.name} ({m.id})</option>
-              ))}
-            </select>
+            <SearchableSelect
+              value={motherId}
+              onChange={setMotherId}
+              options={motherCandidates.map(m => ({ value: m.id, label: `${m.name} (${m.id})` }))}
+            />
           </Field>
         </div>
       </Section>
@@ -479,13 +475,13 @@ export function MemberForm({ member, allMembers, mode }: Props) {
           <p className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">
             {mode === 'create' ? 'Tambah Pasangan' : 'Tambah Pernikahan'}
           </p>
-          <select value={newSpouseId} onChange={e => setNewSpouseId(e.target.value)}
-            className={inputCls} style={inputStyle}>
-            <option value="">Pilih pasangan…</option>
-            {spouseCandidates.map(m => (
-              <option key={m.id} value={m.id}>{m.name} ({m.id})</option>
-            ))}
-          </select>
+          <SearchableSelect
+            value={newSpouseId}
+            onChange={setNewSpouseId}
+            options={spouseCandidates.map(m => ({ value: m.id, label: `${m.name} (${m.id})` }))}
+            placeholder="Pilih pasangan…"
+            emptyLabel="— Pilih pasangan —"
+          />
           <select value={newSpouseStatus} onChange={e => setNewSpouseStatus(e.target.value as MarriageStatus)}
             className={inputCls} style={inputStyle}>
             {MARRIAGE_STATUS_OPTIONS.map(o => (

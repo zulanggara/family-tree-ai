@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchFamilyData } from '@/lib/db/familyRepository';
+import { fetchFamilyData, getDescendantAndSpouseIds } from '@/lib/db/familyRepository';
+import { getRequestSession } from '@/lib/apiAuth';
 import type { FamilyMember } from '@/types';
 import * as XLSX from 'xlsx';
 
@@ -7,7 +8,14 @@ export async function GET(req: NextRequest) {
   const format = new URL(req.url).searchParams.get('format') ?? 'json';
 
   try {
-    const { members } = await fetchFamilyData();
+    const { members: allMembers } = await fetchFamilyData();
+    const session = getRequestSession(req);
+
+    let members = allMembers;
+    if (session?.role === 'family_admin' && session.rootFamilyId) {
+      const allowedIds = new Set(await getDescendantAndSpouseIds(session.rootFamilyId));
+      members = allMembers.filter(m => allowedIds.has(m.id));
+    }
 
     switch (format) {
       case 'json': {
