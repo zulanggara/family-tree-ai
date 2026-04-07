@@ -70,6 +70,19 @@ export async function createAdmin(input: {
   }
 }
 
+export async function getAdminById(id: number): Promise<AdminUser | null> {
+  const sql = getDb();
+  try {
+    const rows = await sql<AdminRow[]>`
+      SELECT id, username, role, root_family_id, created_at FROM admin_users WHERE id = ${id}
+    `;
+    if (!rows[0]) return null;
+    return rowToAdmin(rows[0]);
+  } finally {
+    await sql.end();
+  }
+}
+
 export async function deleteAdmin(id: number): Promise<void> {
   const sql = getDb();
   try {

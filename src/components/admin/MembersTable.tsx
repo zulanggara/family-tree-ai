@@ -150,7 +150,7 @@ export function MembersTable({ members }: { members: FamilyMember[] }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
-                {['ID', 'Nama', 'Gender', 'Lahir', 'Profesi', 'Status', 'Aksi'].map(h => (
+                {['No', 'Nama', 'Gender', 'Lahir', 'Profesi', 'Status', 'Aksi'].map(h => (
                   <th key={h}
                     className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-[var(--text-subtle)] font-semibold">
                     {h}
@@ -159,9 +159,9 @@ export function MembersTable({ members }: { members: FamilyMember[] }) {
               </tr>
             </thead>
             <tbody className="divide-y" style={{ borderColor: 'var(--border)' }}>
-              {paginated.map(m => (
+              {paginated.map((m, i) => (
                 <tr key={m.id} className="hover:bg-[var(--bg)] transition-colors">
-                  <td className="px-4 py-3 text-xs text-[var(--text-subtle)] font-mono">{m.id}</td>
+                  <td className="px-4 py-3 text-xs text-[var(--text-subtle)] tabular-nums">{(safePage - 1) * PAGE_SIZE + i + 1}</td>
                   <td className="px-4 py-3">
                     <div>
                       <p className="font-medium text-[var(--text)]">{m.name}</p>

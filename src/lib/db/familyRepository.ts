@@ -112,27 +112,35 @@ export async function createMember(input: MemberInput): Promise<FamilyMember> {
 export async function updateMember(id: string, input: Partial<MemberInput>): Promise<FamilyMember> {
   const sql = getDb();
   try {
+    // Scalar / JSONB columns — safe to use dynamic sql(updates)
     const updates: Record<string, unknown> = {};
-    if (input.name !== undefined) updates.name = input.name;
-    if (input.photo !== undefined) updates.photo = input.photo ?? '';
-    if (input.gender !== undefined) updates.gender = input.gender;
-    if ('birthDate' in input) updates.birth_date = input.birthDate ?? null;
-    if ('deathDate' in input) updates.death_date = input.deathDate ?? null;
-    if ('birthPlace' in input) updates.birth_place = input.birthPlace ?? null;
-    if ('fatherId' in input) updates.father_id = input.fatherId ?? null;
-    if ('motherId' in input) updates.mother_id = input.motherId ?? null;
-    if ('biography' in input) updates.biography = input.biography ?? null;
-    if ('nickname' in input) updates.nickname = input.nickname ?? null;
-    if ('profession' in input) updates.profession = input.profession ?? null;
-    if ('education' in input) updates.education = input.education ?? null;
-    if ('religion' in input) updates.religion = input.religion ?? null;
+    if (input.name !== undefined)       updates.name        = input.name;
+    if (input.photo !== undefined)      updates.photo       = input.photo ?? '';
+    if (input.gender !== undefined)     updates.gender      = input.gender;
+    if ('birthDate'   in input) updates.birth_date  = input.birthDate   ?? null;
+    if ('deathDate'   in input) updates.death_date  = input.deathDate   ?? null;
+    if ('birthPlace'  in input) updates.birth_place = input.birthPlace  ?? null;
+    if ('fatherId'    in input) updates.father_id   = input.fatherId    ?? null;
+    if ('motherId'    in input) updates.mother_id   = input.motherId    ?? null;
+    if ('biography'   in input) updates.biography   = input.biography   ?? null;
+    if ('nickname'    in input) updates.nickname    = input.nickname    ?? null;
+    if ('profession'  in input) updates.profession  = input.profession  ?? null;
+    if ('education'   in input) updates.education   = input.education   ?? null;
+    if ('religion'    in input) updates.religion    = input.religion    ?? null;
     if ('nationality' in input) updates.nationality = input.nationality ?? null;
-    if (input.hobbies !== undefined) updates.hobbies = input.hobbies;
+    // JSONB column — sql(updates) handles objects/arrays as JSONB correctly
     if (input.socialLinks !== undefined) updates.social_links = input.socialLinks;
-    if (input.gallery !== undefined) updates.gallery = input.gallery;
 
     if (Object.keys(updates).length > 0) {
       await sql`UPDATE family_members SET ${sql(updates)} WHERE id = ${id}`;
+    }
+
+    // TEXT[] columns must use sql.array() — sql(updates) would wrongly cast them as JSONB
+    if (input.hobbies !== undefined) {
+      await sql`UPDATE family_members SET hobbies = ${sql.array(input.hobbies)} WHERE id = ${id}`;
+    }
+    if (input.gallery !== undefined) {
+      await sql`UPDATE family_members SET gallery = ${sql.array(input.gallery)} WHERE id = ${id}`;
     }
 
     const member = await fetchMemberById(id);

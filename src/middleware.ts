@@ -19,9 +19,10 @@ export async function middleware(req: NextRequest) {
   const session = await verifySessionToken(token);
   if (!session) return redirectToLogin(req);
 
-  // Role-based: only super_admin can access admin management
+  // Role-based: only super_admin can access admin management and audit logs
   if (
-    (pathname.startsWith('/admin/admins') || pathname.startsWith('/api/admin/admins')) &&
+    (pathname.startsWith('/admin/admins') || pathname.startsWith('/api/admin/admins') ||
+     pathname.startsWith('/admin/logs')   || pathname.startsWith('/api/admin/logs')) &&
     session.role !== 'super_admin'
   ) {
     if (pathname.startsWith('/api/')) {

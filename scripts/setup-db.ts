@@ -153,6 +153,45 @@ async function createSchema(sql: ReturnType<typeof postgres>) {
     )
   `;
 
+  // ── Audit logs table ───────────────────────────────────────────────────────
+  await sql`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id             BIGSERIAL    PRIMARY KEY,
+      admin_username TEXT         NOT NULL,
+      admin_role     TEXT         NOT NULL,
+      action         TEXT         NOT NULL,
+      entity_type    TEXT         NOT NULL,
+      entity_id      TEXT,
+      entity_name    TEXT,
+      details        JSONB,
+      ip_address     TEXT,
+      created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_created
+      ON audit_logs (created_at DESC)
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_admin
+      ON audit_logs (admin_username)
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_action
+      ON audit_logs (action)
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_entity_type
+      ON audit_logs (entity_type)
+  `;
+
+  // ── gallery column (idempotent) ────────────────────────────────────────────
+  await sql`
+    ALTER TABLE family_members
+      ADD COLUMN IF NOT EXISTS gallery TEXT[] NOT NULL DEFAULT '{}'
+  `;
+
   console.log('✅ Schema ready');
 }
 

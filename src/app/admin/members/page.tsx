@@ -15,7 +15,7 @@ export default async function MembersPage() {
     visible = members.filter(m => allowedIds.has(m.id));
   }
 
-  const sorted = [...visible].sort((a, b) => a.id.localeCompare(b.id));
+  const sorted = [...visible].sort((a, b) => b.id.localeCompare(a.id));
 
   return (
     <div className="p-6">

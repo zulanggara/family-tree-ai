@@ -45,6 +45,7 @@ A beautiful, interactive family tree web application built with Next.js 14, Type
   - MySQL SQL script
 - **Import Data** — Import dari JSON, CSV, atau Excel (.xlsx)
 - **Password Terenkripsi** — Semua password admin di-hash dengan bcrypt (cost 12)
+- **Audit Logs** _(Super Admin only)_ — Riwayat lengkap semua perubahan data: tambah/ubah/hapus anggota, pernikahan, akun admin, dan login/logout. Dilengkapi filter (aksi, tipe data, username) dan pagination yang efisien untuk 1 juta+ entri
 
 ---
 
@@ -142,6 +143,7 @@ Panel admin: [http://localhost:3000/admin](http://localhost:3000/admin)
 | `npm run start` | Production server |
 | `npm run db:setup` | Setup DB + seed data + buat admin default |
 | `npm run db:seed` | Hanya seed data dari family.json |
+| `npm run db:migrate` | Migrasi DB yang sudah ada (tambah tabel audit_logs + kolom gallery) |
 
 ---
 

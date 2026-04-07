@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "db:seed": "tsx scripts/seed.ts",
-    "db:setup": "tsx scripts/setup-db.ts"
+    "db:setup": "tsx scripts/setup-db.ts",
+    "db:migrate": "tsx scripts/migrate-audit-logs.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.78.0",

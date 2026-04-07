@@ -91,6 +91,10 @@ export function MemberForm({ member, allMembers, mode }: Props) {
     setSaving(true);
     setError('');
 
+    // Only send gallery in PUT body when it was explicitly changed from the original value.
+    // This avoids touching the gallery column on DBs that haven't run the migration yet.
+    const galleryChanged = JSON.stringify(gallery) !== JSON.stringify(member?.gallery ?? []);
+
     const body = {
       ...(mode === 'create' && customId ? { id: customId } : {}),
       name, gender, photo: photo || '',
@@ -99,7 +103,8 @@ export function MemberForm({ member, allMembers, mode }: Props) {
       fatherId: fatherId || null, motherId: motherId || null,
       profession: profession || null, education: education || null,
       religion: religion || null, nationality: nationality || null,
-      biography: biography || null, hobbies, gallery,
+      biography: biography || null, hobbies,
+      ...(mode === 'create' || galleryChanged ? { gallery } : {}),
     };
 
     try {
